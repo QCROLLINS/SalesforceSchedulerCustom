@@ -1,0 +1,48 @@
+public with sharing class LXScheduleFirstAvailable {
+
+    @invocableMethod(label='First Available' description='First availabale consultation')
+    public static list<event> ScheduleIt(list<payloadIn> payloadList ){
+        if(payloadList == null || payloadList.size() <> 1) return null;
+        payloadIn pl = payloadList[0];
+        lxscheduler.GetAppointmentCandidatesInput input = new lxscheduler.GetAppointmentCandidatesInputBuilder()
+            .setWorkTypeGroupId('0VS7b000000GmfiGAC')
+            .setTerritoryIds(new List<String>{pl.serviceTerritoryId})
+            .setStartTime(pl.startDateTime.format('yyyy-MM-dd\'T\'HH:mm:ssZ'))
+            .setEndTime(pl.startDateTime.addDays(14).format('yyyy-MM-dd\'T\'HH:mm:ssZ'))
+            .setSchedulingPolicyId('0Vr5x000000blJJ')
+            .setApiVersion(Double.valueOf('50.0'))
+            .build();
+        //call the Apex Method 
+        String response = lxscheduler.SchedulerResources.getAppointmentCandidates(input);
+        //parse the results using JSON.deserialize
+        if(response==null) return null;
+        list<schedulerCandidates> allslots = schedulerCandidates.parse(response);
+        //slots found, return just the first one
+        if(allslots!=null) {
+            event thisevent = new event();
+            thisevent.startdatetime = allslots[0].startTime;
+            //Get Timezone from Flow
+            String targetTimezone = pl.defaulttimezone;
+            thisevent.Text_First_Available = thisevent.startdatetime.format('MM/dd/yyyy hh:mm:ss a z', targetTimezone);
+            return new list<event>{thisevent};
+        }
+        //no slots found, return null
+        return null;
+    }
+    public class payloadIn{
+        @invocableVariable(required=true)
+        public string workTypeGroupId;
+        @invocableVariable(required=true)
+        public string serviceTerritoryId;
+        @invocableVariable(required=true)
+        public datetime startDateTime;
+        @invocableVariable
+        public string defaulttimezone;
+    }
+    public class event{
+        @invocableVariable
+        public datetime startdatetime;
+        @invocableVariable
+        public string Text_First_Available;
+    }
+}
